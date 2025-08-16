@@ -87,15 +87,16 @@
     }
     .like-btn {
       transition: all 0.2s ease;
+      cursor: pointer;
     }
     .like-btn:hover {
       transform: scale(1.2);
     }
     .like-btn.liked {
-      color: #ec4899;
+      color: #ec4899 !important;
     }
     .dark .like-btn.liked {
-      color: #f472b6;
+      color: #f472b6 !important;
     }
     .comment-box {
       max-height: 0;
@@ -104,6 +105,42 @@
     }
     .comment-box.open {
       max-height: 500px;
+    }
+    /* Auth modal styles */
+    .auth-modal {
+      backdrop-filter: blur(10px);
+    }
+    .auth-tab {
+      transition: all 0.3s ease;
+      border-bottom: 2px solid transparent;
+    }
+    .auth-tab.active {
+      border-bottom-color: #ec4899;
+      color: #ec4899;
+    }
+    /* Profile dropdown styles */
+    .profile-dropdown {
+      transform: translateY(-10px);
+      opacity: 0;
+      transition: all 0.2s ease;
+    }
+    .profile-dropdown.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+    /* Notification styles */
+    .notification {
+      transform: translateX(100%);
+      transition: transform 0.3s ease;
+    }
+    .notification.show {
+      transform: translateX(0);
+    }
+    /* Badge styles */
+    .badge {
+      font-size: 0.7rem;
+      padding: 2px 6px;
+      border-radius: 10px;
     }
     /* Dark mode specific styles */
     .dark header {
@@ -221,10 +258,11 @@
       }
     }
   </style>
-  <!-- Only using Firestore from Firebase -->
+  <!-- Firebase SDKs -->
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-storage-compat.js"></script>
 </head>
 
 <body class="text-gray-800">
@@ -237,10 +275,49 @@
           <h1 class="text-5xl md:text-6xl pacifico text-center text-pink-900 drop-shadow-lg">MACE Memories</h1>
           <p class="text-center text-lg mt-2 italic text-pink-800 font-medium">Preserving the chaos, laughter, and love of our college journey</p>
         </div>
-        <button id="themeToggle" class="p-2 rounded-full bg-white/30 hover:bg-white/50 transition">
-          <i class="fas fa-moon text-xl text-gray-800 dark-mode-icon hidden"></i>
-          <i class="fas fa-sun text-xl text-yellow-500 light-mode-icon"></i>
-        </button>
+        <div class="flex items-center space-x-4">
+          <!-- User Profile Section -->
+          <div id="userSection" class="hidden">
+            <div class="relative">
+              <button id="profileButton" class="flex items-center space-x-2 bg-white/30 hover:bg-white/50 px-4 py-2 rounded-full transition">
+                <img id="userAvatar" src="" alt="Avatar" class="w-8 h-8 rounded-full">
+                <span id="userName" class="text-pink-900 font-medium hidden md:block"></span>
+                <i class="fas fa-chevron-down text-pink-900"></i>
+              </button>
+              <div id="profileDropdown" class="profile-dropdown absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-lg py-2 z-50 hidden">
+                <div class="px-4 py-2 border-b dark:border-gray-700">
+                  <p class="font-medium text-gray-800 dark:text-white" id="dropdownUserName"></p>
+                  <p class="text-sm text-gray-500 dark:text-gray-400" id="dropdownUserBatch"></p>
+                </div>
+                <a href="#profile" class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-pink-100 dark:hover:bg-gray-700">
+                  <i class="fas fa-user mr-2"></i> My Profile
+                </a>
+                <a href="#my-memories" class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-pink-100 dark:hover:bg-gray-700">
+                  <i class="fas fa-images mr-2"></i> My Memories
+                </a>
+                <a href="#settings" class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-pink-100 dark:hover:bg-gray-700">
+                  <i class="fas fa-cog mr-2"></i> Settings
+                </a>
+                <div class="border-t dark:border-gray-700 mt-2 pt-2">
+                  <button id="signOutBtn" class="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-100 dark:hover:bg-red-900">
+                    <i class="fas fa-sign-out-alt mr-2"></i> Sign Out
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- Auth Buttons for non-logged in users -->
+          <div id="authSection">
+            <button id="loginBtn" class="bg-white/30 hover:bg-white/50 px-4 py-2 rounded-full text-pink-900 font-medium transition">
+              Login
+            </button>
+          </div>
+          <!-- Theme Toggle -->
+          <button id="themeToggle" class="p-2 rounded-full bg-white/30 hover:bg-white/50 transition">
+            <i class="fas fa-moon text-xl text-gray-800 dark-mode-icon hidden"></i>
+            <i class="fas fa-sun text-xl text-yellow-500 light-mode-icon"></i>
+          </button>
+        </div>
       </div>
     </div>
     <div class="absolute bottom-0 left-0 right-0 h-2 bg-gradient-to-r from-pink-500 via-red-400 to-yellow-300"></div>
@@ -301,30 +378,36 @@
       <h2 class="text-3xl font-bold mb-6 text-pink-700 flex items-center">
         <i class="fas fa-plus-circle mr-3"></i> Share a Memory
       </h2>
+      <div id="loginPrompt" class="text-center py-8 hidden">
+        <i class="fas fa-lock text-4xl text-pink-300 mb-4"></i>
+        <h3 class="text-xl text-pink-700 mb-2">Please Login to Share Memories</h3>
+        <p class="text-pink-500 mb-4">You need to be logged in to share your college memories</p>
+        <button id="loginPromptBtn" class="bg-pink-600 text-white px-6 py-2 rounded-lg hover:bg-pink-700 transition">
+          Login / Sign Up
+        </button>
+      </div>
       <form id="memoryForm" class="space-y-5">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
           <div>
-            <label for="name" class="block text-sm font-medium text-pink-700 mb-1">Your Name</label>
-            <input id="name" type="text" placeholder="Enter your name" class="w-full p-3 border border-pink-200 rounded-lg focus:ring-2 focus:ring-pink-300 focus:border-pink-300" required />
+            <label for="title" class="block text-sm font-medium text-pink-700 mb-1">Memory Title</label>
+            <input id="title" type="text" placeholder="Give your memory a title" class="w-full p-3 border border-pink-200 rounded-lg focus:ring-2 focus:ring-pink-300 focus:border-pink-300" required />
           </div>
           <div>
-            <label for="batch" class="block text-sm font-medium text-pink-700 mb-1">Batch</label>
-            <select id="batch" class="w-full p-3 border border-pink-200 rounded-lg focus:ring-2 focus:ring-pink-300 focus:border-pink-300">
-              <option value="">Select your batch</option>
-              <option value="DS">DS</option>
-              <option value="CS">CS</option>
-              <option value="AIML">AIML</option>
-              <option value="EEE">EEE</option>
-              <option value="ECE">ECE</option>
-              <option value="ME">ME</option>
-              <option value="CE">CE</option>
-              <option value="Hostel">Hostel</option>
+            <label for="category" class="block text-sm font-medium text-pink-700 mb-1">Category</label>
+            <select id="category" class="w-full p-3 border border-pink-200 rounded-lg focus:ring-2 focus:ring-pink-300 focus:border-pink-300">
+              <option value="">Select category</option>
+              <option value="campus">Campus Life</option>
+              <option value="events">Events</option>
+              <option value="friendship">Friendship</option>
+              <option value="academics">Academics</option>
+              <option value="hostel">Hostel Life</option>
+              <option value="faculty">Faculty</option>
+              <option value="sports">Sports</option>
+              <option value="cultural">Cultural</option>
+              <option value="graduation">Graduation</option>
+              <option value="other">Other</option>
             </select>
           </div>
-        </div>
-        <div>
-          <label for="title" class="block text-sm font-medium text-pink-700 mb-1">Memory Title</label>
-          <input id="title" type="text" placeholder="Give your memory a title" class="w-full p-3 border border-pink-200 rounded-lg focus:ring-2 focus:ring-pink-300 focus:border-pink-300" required />
         </div>
         <div>
           <label for="desc" class="block text-sm font-medium text-pink-700 mb-1">Memory Description</label>
@@ -348,9 +431,15 @@
           </div>
         </div>
         <div class="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
-          <div class="flex items-center">
-            <input id="anonymous" type="checkbox" class="w-4 h-4 text-pink-600 rounded focus:ring-pink-500">
-            <label for="anonymous" class="ml-2 text-sm text-pink-700">Post anonymously</label>
+          <div class="flex items-center space-x-4">
+            <div class="flex items-center">
+              <input id="anonymous" type="checkbox" class="w-4 h-4 text-pink-600 rounded focus:ring-pink-500">
+              <label for="anonymous" class="ml-2 text-sm text-pink-700">Post anonymously</label>
+            </div>
+            <div class="flex items-center">
+              <input id="allowComments" type="checkbox" checked class="w-4 h-4 text-pink-600 rounded focus:ring-pink-500">
+              <label for="allowComments" class="ml-2 text-sm text-pink-700">Allow comments</label>
+            </div>
           </div>
           <button type="submit" id="submitBtn" class="bg-gradient-to-r from-pink-500 to-red-400 text-white px-8 py-3 rounded-lg hover:from-pink-600 hover:to-red-500 transition-all shadow-lg hover:shadow-xl flex items-center">
             <i class="fas fa-paper-plane mr-2"></i> Share Memory
@@ -396,12 +485,13 @@
         <h3 class="text-xl text-pink-700 mt-6 mb-3">Our Mission</h3>
         <p>College life is full of unforgettable moments - the laughter, the struggles, the friendships, and the growth. This platform is designed to help us capture and cherish these memories forever.</p>
         
-        <h3 class="text-xl text-pink-700 mt-6 mb-3">Features</h3>
+        <h3 class="text-xl text-pink-700 mt-6 mb-3">New Features</h3>
         <ul class="list-disc pl-5 space-y-2">
-          <li><span class="font-medium">Share Memories:</span> Upload photos and stories from campus life</li>
-          <li><span class="font-medium">Wall of Love:</span> Send appreciation notes to your friends and faculty</li>
-          <li><span class="font-medium">Relive Moments:</span> Browse through memories by batch or popularity</li>
-          <li><span class="font-medium">Interactive:</span> Like and comment on memories</li>
+          <li><span class="font-medium">User Profiles:</span> Create your personalized profile with avatar</li>
+          <li><span class="font-medium">Enhanced Security:</span> Proper login/signup system</li>
+          <li><span class="font-medium">Better Interactions:</span> Fixed like and comment system</li>
+          <li><span class="font-medium">Categories:</span> Organize memories by type</li>
+          <li><span class="font-medium">Real-time Updates:</span> See new content instantly</li>
         </ul>
         
         <h3 class="text-xl text-pink-700 mt-6 mb-3">The Team</h3>
@@ -419,15 +509,96 @@
     <i class="fas fa-arrow-up text-xl"></i>
   </button>
 
-  <footer class="text-center p-6 mt-12 text-sm text-gray-600 bg-white/80">
-    <div class="flex justify-center space-x-4 mb-3">
-      <a href="#" class="text-pink-500 hover:text-pink-700"><i class="fab fa-facebook-f"></i></a>
-      <a href="#" class="text-pink-500 hover:text-pink-700"><i class="fab fa-instagram"></i></a>
-      <a href="#" class="text-pink-500 hover:text-pink-700"><i class="fab fa-twitter"></i></a>
+  <!-- Authentication Modal -->
+  <div id="authModal" class="auth-modal fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white dark:bg-gray-800 rounded-xl max-w-md w-full">
+      <div class="p-6">
+        <div class="flex justify-between items-center mb-6">
+          <h2 class="text-2xl font-bold text-pink-700 dark:text-pink-400">Welcome to MACE</h2>
+          <button id="closeAuthModal" class="text-gray-500 hover:text-gray-700 dark:text-gray-300">
+            <i class="fas fa-times text-xl"></i>
+          </button>
+        </div>
+        
+        <!-- Auth Tabs -->
+        <div class="flex mb-6">
+          <button id="loginTab" class="auth-tab flex-1 py-2 text-center font-medium active">Login</button>
+          <button id="signupTab" class="auth-tab flex-1 py-2 text-center font-medium">Sign Up</button>
+        </div>
+
+        <!-- Login Form -->
+        <form id="loginForm" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
+            <input type="email" id="loginEmail" required class="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-pink-500 dark:bg-gray-700 dark:text-white" placeholder="your.email@mace.ac.in">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Password</label>
+            <input type="password" id="loginPassword" required class="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-pink-500 dark:bg-gray-700 dark:text-white" placeholder="Enter your password">
+          </div>
+          <button type="submit" class="w-full bg-pink-600 text-white py-3 rounded-lg hover:bg-pink-700 transition font-medium">
+            <i class="fas fa-sign-in-alt mr-2"></i> Login
+          </button>
+          <div class="text-center">
+            <button type="button" id="forgotPasswordBtn" class="text-pink-600 hover:text-pink-700 text-sm">Forgot Password?</button>
+          </div>
+        </form>
+
+        <!-- Signup Form -->
+        <form id="signupForm" class="space-y-4 hidden">
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">First Name</label>
+              <input type="text" id="signupFirstName" required class="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-pink-500 dark:bg-gray-700 dark:text-white" placeholder="John">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Last Name</label>
+              <input type="text" id="signupLastName" required class="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-pink-500 dark:bg-gray-700 dark:text-white" placeholder="Doe">
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
+            <input type="email" id="signupEmail" required class="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-pink-500 dark:bg-gray-700 dark:text-white" placeholder="your.email@mace.ac.in">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Batch</label>
+            <select id="signupBatch" required class="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-pink-500 dark:bg-gray-700 dark:text-white">
+              <option value="">Select your batch</option>
+              <option value="DS">DS</option>
+              <option value="CS">CS</option>
+              <option value="AIML">AIML</option>
+              <option value="EEE">EEE</option>
+              <option value="ECE">ECE</option>
+              <option value="ME">ME</option>
+              <option value="CE">CE</option>
+              <option value="Hostel">Hostel</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Password</label>
+            <input type="password" id="signupPassword" required class="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-pink-500 dark:bg-gray-700 dark:text-white" placeholder="Create a strong password">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Confirm Password</label>
+            <input type="password" id="signupConfirmPassword" required class="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-pink-500 dark:bg-gray-700 dark:text-white" placeholder="Confirm your password">
+          </div>
+          <button type="submit" class="w-full bg-pink-600 text-white py-3 rounded-lg hover:bg-pink-700 transition font-medium">
+            <i class="fas fa-user-plus mr-2"></i> Create Account
+          </button>
+        </form>
+
+        <div id="authError" class="hidden mt-4 p-3 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-lg text-sm">
+          <i class="fas fa-exclamation-circle mr-2"></i>
+          <span id="authErrorMessage"></span>
+        </div>
+        
+        <div id="authSuccess" class="hidden mt-4 p-3 bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-lg text-sm">
+          <i class="fas fa-check-circle mr-2"></i>
+          <span id="authSuccessMessage"></span>
+        </div>
+      </div>
     </div>
-    <p>🎓 Made with ❤️ by Dathan | MACE Memories © 2025</p>
-    <p class="mt-1 text-xs text-gray-400">All memories belong to their respective contributors</p>
-  </footer>
+  </div>
 
   <!-- Memory Modal -->
   <div id="memoryModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 hidden">
@@ -444,20 +615,24 @@
           <div>
             <p id="modalAuthor" class="text-pink-600 dark:text-pink-400 font-medium"></p>
             <p id="modalBatch" class="text-sm text-gray-500 dark:text-gray-400"></p>
+            <p id="modalDate" class="text-xs text-gray-400 dark:text-gray-500"></p>
           </div>
           <div class="flex items-center space-x-4">
             <button id="modalLikeBtn" class="like-btn text-gray-400 hover:text-pink-500 dark:hover:text-pink-400">
-              <i class="far fa-heart"></i> <span id="likeCount">0</span>
+              <i class="far fa-heart"></i> <span id="modalLikeCount">0</span>
             </button>
             <button id="modalCommentBtn" class="text-gray-400 hover:text-pink-500 dark:hover:text-pink-400">
-              <i class="far fa-comment"></i> <span id="commentCount">0</span>
+              <i class="far fa-comment"></i> <span id="modalCommentCount">0</span>
+            </button>
+            <button id="modalShareBtn" class="text-gray-400 hover:text-pink-500 dark:hover:text-pink-400">
+              <i class="fas fa-share"></i>
             </button>
           </div>
         </div>
         <p id="modalDescription" class="text-gray-700 dark:text-gray-300 mb-6"></p>
-        <div class="border-t dark:border-gray-700 pt-4">
+        <div id="modalCommentsSection" class="border-t dark:border-gray-700 pt-4">
           <h4 class="font-medium text-pink-700 dark:text-pink-400 mb-3">Comments</h4>
-          <div id="modalComments" class="space-y-3 mb-4">
+          <div id="modalComments" class="space-y-3 mb-4 max-h-60 overflow-y-auto">
             <!-- Comments will appear here -->
           </div>
           <form id="commentForm" class="flex">
@@ -466,13 +641,32 @@
               <i class="fas fa-paper-plane"></i>
             </button>
           </form>
+          <div id="loginToComment" class="hidden text-center py-4">
+            <p class="text-gray-500 dark:text-gray-400 mb-2">Please login to comment</p>
+            <button class="text-pink-600 hover:text-pink-700 text-sm font-medium">Login</button>
+          </div>
         </div>
       </div>
     </div>
   </div>
 
+  <!-- Notification Container -->
+  <div id="notificationContainer" class="fixed top-4 right-4 z-50 space-y-2">
+    <!-- Notifications will appear here -->
+  </div>
+
+  <footer class="text-center p-6 mt-12 text-sm text-gray-600 bg-white/80">
+    <div class="flex justify-center space-x-4 mb-3">
+      <a href="#" class="text-pink-500 hover:text-pink-700"><i class="fab fa-facebook-f"></i></a>
+      <a href="#" class="text-pink-500 hover:text-pink-700"><i class="fab fa-instagram"></i></a>
+      <a href="#" class="text-pink-500 hover:text-pink-700"><i class="fab fa-twitter"></i></a>
+    </div>
+    <p>🎓 Made with ❤️ by Dathan | MACE Memories © 2025</p>
+    <p class="mt-1 text-xs text-gray-400">All memories belong to their respective contributors</p>
+  </footer>
+
   <script>
-    // Firebase configuration (Firestore only)
+    // Firebase configuration
     const firebaseConfig = {
       apiKey: "AIzaSyApTrNe1cay-7qvQl2E5vI1XD6VVa5g4s4",
       authDomain: "mace-memories.firebaseapp.com",
@@ -481,14 +675,15 @@
       appId: "1:570193691300:web:0ce9c7f546d3c3a03e5c31"
     };
 
-    // Initialize Firebase (only Firestore)
+    // Initialize Firebase
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
     const auth = firebase.auth();
+    const storage = firebase.storage();
 
-    // Cloudinary configuration - REPLACE WITH YOUR OWN
-    const cloudName = "dazdmyujy"; // From Cloudinary dashboard
-    const uploadPreset = "mace_memories"; // From Cloudinary settings
+    // Cloudinary configuration
+    const cloudName = "dazdmyujy";
+    const uploadPreset = "mace_memories";
 
     // DOM elements
     const memoryForm = document.getElementById("memoryForm");
@@ -506,34 +701,235 @@
     const sortPopular = document.getElementById("sortPopular");
     const memoryModal = document.getElementById("memoryModal");
     const closeModal = document.getElementById("closeModal");
-    const modalImage = document.getElementById("modalImage");
-    const modalTitle = document.getElementById("modalTitle");
-    const modalAuthor = document.getElementById("modalAuthor");
-    const modalBatch = document.getElementById("modalBatch");
-    const modalDescription = document.getElementById("modalDescription");
-    const modalLikeBtn = document.getElementById("modalLikeBtn");
-    const likeCount = document.getElementById("likeCount");
-    const commentCount = document.getElementById("commentCount");
-    const modalComments = document.getElementById("modalComments");
-    const commentForm = document.getElementById("commentForm");
-    const commentInput = document.getElementById("commentInput");
-    const formSuccess = document.getElementById("formSuccess");
-    const formError = document.getElementById("formError");
-    const errorMessage = document.getElementById("errorMessage");
-    const loveNotesContainer = document.getElementById("loveNotesContainer");
+    const authModal = document.getElementById("authModal");
+    const closeAuthModal = document.getElementById("closeAuthModal");
+    const loginBtn = document.getElementById("loginBtn");
+    const loginPromptBtn = document.getElementById("loginPromptBtn");
+    const loginTab = document.getElementById("loginTab");
+    const signupTab = document.getElementById("signupTab");
+    const loginForm = document.getElementById("loginForm");
+    const signupForm = document.getElementById("signupForm");
+    const userSection = document.getElementById("userSection");
+    const authSection = document.getElementById("authSection");
+    const profileButton = document.getElementById("profileButton");
+    const profileDropdown = document.getElementById("profileDropdown");
+    const signOutBtn = document.getElementById("signOutBtn");
+    const loginPrompt = document.getElementById("loginPrompt");
     const themeToggle = document.getElementById("themeToggle");
     const darkModeIcon = document.querySelector('.dark-mode-icon');
     const lightModeIcon = document.querySelector('.light-mode-icon');
     const mobileMenuButton = document.getElementById('mobileMenuButton');
     const mobileMenuDropdown = document.getElementById('mobileMenuDropdown');
 
-    // Current memory ID for modal
+    // Global variables
+    let currentUser = null;
     let currentMemoryId = null;
+    let memoriesListener = null;
+
+    // Initialize auth state listener
+    auth.onAuthStateChanged((user) => {
+      currentUser = user;
+      updateUIForAuthState(user);
+      
+      if (user && !user.isAnonymous) {
+        // Load or create user profile
+        loadUserProfile(user);
+      }
+    });
+
+    // Update UI based on authentication state
+    function updateUIForAuthState(user) {
+      if (user && !user.isAnonymous) {
+        userSection.classList.remove('hidden');
+        authSection.classList.add('hidden');
+        memoryForm.classList.remove('hidden');
+        loginPrompt.classList.add('hidden');
+      } else {
+        userSection.classList.add('hidden');
+        authSection.classList.remove('hidden');
+        memoryForm.classList.add('hidden');
+        loginPrompt.classList.remove('hidden');
+      }
+    }
+
+    // Load user profile
+    async function loadUserProfile(user) {
+      try {
+        const userDoc = await db.collection('users').doc(user.uid).get();
+        if (userDoc.exists) {
+          const userData = userDoc.data();
+          document.getElementById('userName').textContent = userData.firstName;
+          document.getElementById('dropdownUserName').textContent = `${userData.firstName} ${userData.lastName}`;
+          document.getElementById('dropdownUserBatch').textContent = `Batch: ${userData.batch}`;
+          
+          // Set avatar
+          const avatar = userData.avatar || `https://ui-avatars.com/api/?name=${userData.firstName}+${userData.lastName}&background=ec4899&color=fff`;
+          document.getElementById('userAvatar').src = avatar;
+        }
+      } catch (error) {
+        console.error('Error loading user profile:', error);
+      }
+    }
+
+    // Show notification
+    function showNotification(message, type = 'info') {
+      const notification = document.createElement('div');
+      notification.className = `notification bg-white dark:bg-gray-800 border-l-4 ${type === 'success' ? 'border-green-500' : type === 'error' ? 'border-red-500' : 'border-blue-500'} p-4 rounded-lg shadow-lg max-w-sm`;
+      
+      notification.innerHTML = `
+        <div class="flex items-center">
+          <i class="fas ${type === 'success' ? 'fa-check-circle text-green-500' : type === 'error' ? 'fa-exclamation-circle text-red-500' : 'fa-info-circle text-blue-500'} mr-2"></i>
+          <span class="text-sm text-gray-700 dark:text-gray-300">${message}</span>
+          <button class="ml-auto text-gray-400 hover:text-gray-600" onclick="this.parentElement.parentElement.remove()">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+      `;
+      
+      document.getElementById('notificationContainer').appendChild(notification);
+      
+      // Auto remove after 5 seconds
+      setTimeout(() => {
+        if (notification.parentElement) {
+          notification.remove();
+        }
+      }, 5000);
+      
+      // Show animation
+      setTimeout(() => {
+        notification.classList.add('show');
+      }, 100);
+    }
+
+    // Authentication functions
+    loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('loginEmail').value;
+      const password = document.getElementById('loginPassword').value;
+      
+      try {
+        await auth.signInWithEmailAndPassword(email, password);
+        authModal.classList.add('hidden');
+        showNotification('Welcome back!', 'success');
+      } catch (error) {
+        showAuthError(error.message);
+      }
+    });
+
+    signupForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const firstName = document.getElementById('signupFirstName').value;
+      const lastName = document.getElementById('signupLastName').value;
+      const email = document.getElementById('signupEmail').value;
+      const batch = document.getElementById('signupBatch').value;
+      const password = document.getElementById('signupPassword').value;
+      const confirmPassword = document.getElementById('signupConfirmPassword').value;
+      
+      if (password !== confirmPassword) {
+        showAuthError('Passwords do not match');
+        return;
+      }
+      
+      if (password.length < 6) {
+        showAuthError('Password must be at least 6 characters');
+        return;
+      }
+      
+      try {
+        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+        const user = userCredential.user;
+        
+        // Create user profile in Firestore
+        await db.collection('users').doc(user.uid).set({
+          firstName,
+          lastName,
+          email,
+          batch,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+          avatar: `https://ui-avatars.com/api/?name=${firstName}+${lastName}&background=ec4899&color=fff`,
+          memoriesCount: 0,
+          likesCount: 0
+        });
+        
+        // Update display name
+        await user.updateProfile({
+          displayName: `${firstName} ${lastName}`
+        });
+        
+        authModal.classList.add('hidden');
+        showNotification('Account created successfully!', 'success');
+      } catch (error) {
+        showAuthError(error.message);
+      }
+    });
+
+    function showAuthError(message) {
+      document.getElementById('authErrorMessage').textContent = message;
+      document.getElementById('authError').classList.remove('hidden');
+      document.getElementById('authSuccess').classList.add('hidden');
+    }
+
+    // Auth modal controls
+    loginBtn.addEventListener('click', () => {
+      authModal.classList.remove('hidden');
+    });
+
+    loginPromptBtn.addEventListener('click', () => {
+      authModal.classList.remove('hidden');
+    });
+
+    closeAuthModal.addEventListener('click', () => {
+      authModal.classList.add('hidden');
+    });
+
+    loginTab.addEventListener('click', () => {
+      loginTab.classList.add('active');
+      signupTab.classList.remove('active');
+      loginForm.classList.remove('hidden');
+      signupForm.classList.add('hidden');
+    });
+
+    signupTab.addEventListener('click', () => {
+      signupTab.classList.add('active');
+      loginTab.classList.remove('active');
+      signupForm.classList.remove('hidden');
+      loginForm.classList.add('hidden');
+    });
+
+    // Profile dropdown
+    profileButton.addEventListener('click', () => {
+      profileDropdown.classList.toggle('hidden');
+      profileDropdown.classList.toggle('show');
+    });
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!profileButton.contains(e.target) && !profileDropdown.contains(e.target)) {
+        profileDropdown.classList.add('hidden');
+        profileDropdown.classList.remove('show');
+      }
+    });
+
+    // Sign out
+    signOutBtn.addEventListener('click', async () => {
+      try {
+        await auth.signOut();
+        showNotification('Signed out successfully', 'success');
+      } catch (error) {
+        showNotification('Error signing out', 'error');
+      }
+    });
 
     // Image preview handler
     imageInput.addEventListener("change", function() {
       const file = this.files[0];
       if (file) {
+        if (file.size > 5 * 1024 * 1024) { // 5MB limit
+          showNotification('Image size must be less than 5MB', 'error');
+          this.value = '';
+          return;
+        }
+        
         const reader = new FileReader();
         reader.onload = function(e) {
           previewImage.src = e.target.result;
@@ -564,7 +960,6 @@
       const isDarkMode = document.body.classList.contains('dark');
       localStorage.setItem('darkMode', isDarkMode);
       
-      // Toggle icons
       if (isDarkMode) {
         darkModeIcon.classList.remove('hidden');
         lightModeIcon.classList.add('hidden');
@@ -579,7 +974,6 @@
       mobileMenuDropdown.classList.toggle('hidden');
     });
 
-    // Close mobile menu when clicking outside
     document.addEventListener('click', (e) => {
       if (!mobileMenuButton.contains(e.target) && !mobileMenuDropdown.contains(e.target)) {
         mobileMenuDropdown.classList.add('hidden');
@@ -591,30 +985,31 @@
       document.body.classList.add('dark');
       darkModeIcon.classList.remove('hidden');
       lightModeIcon.classList.add('hidden');
-    } else {
-      document.body.classList.remove('dark');
-      darkModeIcon.classList.add('hidden');
-      lightModeIcon.classList.remove('hidden');
     }
 
-    // Memory form submission with Cloudinary
+    // Memory form submission
     memoryForm.addEventListener("submit", async (e) => {
       e.preventDefault();
+      
+      if (!currentUser || currentUser.isAnonymous) {
+        showNotification('Please login to share memories', 'error');
+        return;
+      }
       
       const submitBtn = document.getElementById("submitBtn");
       const originalBtnText = submitBtn.innerHTML;
       submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Uploading...';
       submitBtn.disabled = true;
       
-      const name = document.getElementById("name").value;
       const title = document.getElementById("title").value;
       const desc = document.getElementById("desc").value;
-      const batch = document.getElementById("batch").value;
+      const category = document.getElementById("category").value;
       const anonymous = document.getElementById("anonymous").checked;
+      const allowComments = document.getElementById("allowComments").checked;
       const file = imageInput.files[0];
       
       if (!file) {
-        showError("Please select an image");
+        showNotification("Please select an image", 'error');
         submitBtn.innerHTML = originalBtnText;
         submitBtn.disabled = false;
         return;
@@ -638,36 +1033,45 @@
         const data = await response.json();
         const imageUrl = data.secure_url;
         
+        // Get user data
+        const userDoc = await db.collection('users').doc(currentUser.uid).get();
+        const userData = userDoc.data();
+        
         // Save memory data to Firestore
-        await db.collection("memories").add({
-          name: anonymous ? "Anonymous" : name,
+        const memoryData = {
           title,
           desc,
-          batch,
+          category: category || 'other',
           imageUrl: imageUrl,
-          created: firebase.firestore.FieldValue.serverTimestamp(),
+          authorId: currentUser.uid,
+          authorName: anonymous ? "Anonymous" : `${userData.firstName} ${userData.lastName}`,
+          authorBatch: anonymous ? "" : userData.batch,
+          anonymous: anonymous,
+          allowComments: allowComments,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
           likes: 0,
           likesBy: [],
-          comments: []
+          comments: [],
+          views: 0
+        };
+        
+        await db.collection("memories").add(memoryData);
+        
+        // Update user's memory count
+        await db.collection('users').doc(currentUser.uid).update({
+          memoriesCount: firebase.firestore.FieldValue.increment(1)
         });
         
         // Reset form and show success
         memoryForm.reset();
         imagePreview.classList.add("hidden");
-        formSuccess.classList.remove("hidden");
-        formError.classList.add("hidden");
+        showNotification('Memory shared successfully!', 'success');
         submitBtn.innerHTML = originalBtnText;
         submitBtn.disabled = false;
         
-        // Hide success message after 5 seconds
-        setTimeout(() => {
-          formSuccess.classList.add("hidden");
-        }, 5000);
-        
-        // Reload memories
-        loadMemories();
       } catch (err) {
-        showError("Error submitting memory: " + err.message);
+        console.error("Error submitting memory:", err);
+        showNotification("Error submitting memory: " + err.message, 'error');
         submitBtn.innerHTML = originalBtnText;
         submitBtn.disabled = false;
       }
@@ -686,38 +1090,34 @@
           to,
           from,
           message,
-          created: firebase.firestore.FieldValue.serverTimestamp(),
+          authorId: currentUser ? currentUser.uid : null,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
           likes: 0,
           likesBy: []
         });
         
         loveNoteForm.reset();
-        loadLoveNotes();
+        showNotification('Love note posted!', 'success');
         
-        // Show temporary success message
-        const successMsg = document.createElement("div");
-        successMsg.className = "fixed bottom-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg";
-        successMsg.innerHTML = '<i class="fas fa-check mr-2"></i> Love note posted!';
-        document.body.appendChild(successMsg);
-        
-        setTimeout(() => {
-          successMsg.remove();
-        }, 3000);
       } catch (err) {
         console.error("Error posting love note:", err);
-        showError("Failed to post love note");
+        showNotification("Failed to post love note", 'error');
       }
     });
 
-    // Load memories from Firestore
-    async function loadMemories(query = null) {
+    // Load memories with real-time updates
+    function loadMemories(query = null) {
       loadingMemories.classList.remove("hidden");
       memoryGrid.innerHTML = "";
       
-      try {
-        let memoriesQuery = query || db.collection("memories").orderBy("created", "desc");
-        const snapshot = await memoriesQuery.get();
-        
+      // Unsubscribe from previous listener
+      if (memoriesListener) {
+        memoriesListener();
+      }
+      
+      let memoriesQuery = query || db.collection("memories").orderBy("createdAt", "desc").limit(20);
+      
+      memoriesListener = memoriesQuery.onSnapshot((snapshot) => {
         if (snapshot.empty) {
           noMemories.classList.remove("hidden");
           loadingMemories.classList.add("hidden");
@@ -725,6 +1125,7 @@
         }
         
         noMemories.classList.add("hidden");
+        memoryGrid.innerHTML = "";
         
         snapshot.forEach(doc => {
           const memory = doc.data();
@@ -733,21 +1134,31 @@
           const memoryCard = document.createElement("div");
           memoryCard.className = "bg-white memory-card shadow-lg rounded-xl overflow-hidden dark:bg-gray-800 dark:text-white";
           memoryCard.innerHTML = `
-            <img src="${memory.imageUrl}" class="w-full h-60 object-cover cursor-pointer" alt="${memory.title}" />
+            <div class="relative">
+              <img src="${memory.imageUrl}" class="w-full h-60 object-cover cursor-pointer" alt="${memory.title}" onclick="openMemoryModal('${memoryId}')" />
+              ${memory.category ? `<span class="badge absolute top-2 right-2 bg-pink-500 text-white">${memory.category}</span>` : ''}
+            </div>
             <div class="p-4">
               <h3 class="text-xl font-semibold text-pink-700 dark:text-pink-400 mb-1">${memory.title}</h3>
-              <p class="text-sm text-gray-600 dark:text-gray-300 mb-2">by ${memory.name} ${memory.batch ? `· Batch ${memory.batch}` : ''}</p>
-              <p class="text-sm text-gray-700 dark:text-gray-300 line-clamp-2">${memory.desc}</p>
-              <div class="flex justify-between items-center mt-3 pt-3 border-t border-pink-100 dark:border-gray-700">
-                <button class="text-pink-500 hover:text-pink-700 dark:hover:text-pink-400 text-sm font-medium view-memory" data-id="${memoryId}">
+              <p class="text-sm text-gray-600 dark:text-gray-300 mb-2">
+                by ${memory.authorName} 
+                ${memory.authorBatch ? `• Batch ${memory.authorBatch}` : ''} 
+                ${memory.createdAt ? `• ${formatDate(memory.createdAt.toDate())}` : ''}
+              </p>
+              <p class="text-sm text-gray-700 dark:text-gray-300 line-clamp-2 mb-3">${memory.desc}</p>
+              <div class="flex justify-between items-center pt-3 border-t border-pink-100 dark:border-gray-700">
+                <button class="text-pink-500 hover:text-pink-700 dark:hover:text-pink-400 text-sm font-medium" onclick="openMemoryModal('${memoryId}')">
                   View Memory
                 </button>
                 <div class="flex items-center space-x-3">
-                  <span class="text-xs text-pink-500 dark:text-pink-400 flex items-center">
-                    <i class="far fa-heart mr-1"></i> ${memory.likes || 0}
-                  </span>
+                  <button class="like-btn-card text-gray-400 hover:text-pink-500 dark:hover:text-pink-400 ${memory.likesBy && currentUser && memory.likesBy.includes(currentUser.uid) ? 'liked' : ''}" data-memory-id="${memoryId}">
+                    <i class="${memory.likesBy && currentUser && memory.likesBy.includes(currentUser.uid) ? 'fas' : 'far'} fa-heart mr-1"></i> ${memory.likes || 0}
+                  </button>
                   <span class="text-xs text-pink-500 dark:text-pink-400 flex items-center">
                     <i class="far fa-comment mr-1"></i> ${memory.comments ? memory.comments.length : 0}
+                  </span>
+                  <span class="text-xs text-pink-500 dark:text-pink-400 flex items-center">
+                    <i class="far fa-eye mr-1"></i> ${memory.views || 0}
                   </span>
                 </div>
               </div>
@@ -757,55 +1168,65 @@
           memoryGrid.appendChild(memoryCard);
         });
         
-        // Add click event to view memory buttons
-        document.querySelectorAll(".view-memory").forEach(btn => {
-          btn.addEventListener("click", () => openMemoryModal(btn.dataset.id));
+        // Add click event listeners to like buttons
+        document.querySelectorAll('.like-btn-card').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            likeMemory(btn.dataset.memoryId);
+          });
         });
         
-      } catch (err) {
-        console.error("Error loading memories:", err);
-        showError("Failed to load memories");
-      } finally {
         loadingMemories.classList.add("hidden");
-      }
+      }, (error) => {
+        console.error("Error loading memories:", error);
+        showNotification("Failed to load memories", 'error');
+        loadingMemories.classList.add("hidden");
+      });
     }
 
-    // Load love notes from Firestore
-    async function loadLoveNotes() {
+    // Load love notes with real-time updates
+    function loadLoveNotes() {
+      const loveNotesContainer = document.getElementById("loveNotesContainer");
       loveNotesContainer.innerHTML = "";
       
-      try {
-        const snapshot = await db.collection("loveNotes").orderBy("created", "desc").limit(20).get();
-        
-        snapshot.forEach(doc => {
-          const note = doc.data();
-          const noteId = doc.id;
-          const date = note.created ? note.created.toDate() : new Date();
+      db.collection("loveNotes").orderBy("createdAt", "desc").limit(20)
+        .onSnapshot((snapshot) => {
+          loveNotesContainer.innerHTML = "";
           
-          const noteElement = document.createElement("div");
-          noteElement.className = "bg-white shadow-md p-5 rounded-xl border-l-4 border-pink-400 dark:bg-gray-800 dark:border-pink-600";
-          noteElement.innerHTML = `
-            <p class="text-pink-700 dark:text-pink-300"><strong class="text-pink-800 dark:text-pink-400">To ${note.to}:</strong> ${note.message} - <span class="font-medium">${note.from}</span></p>
-            <div class="flex justify-between items-center mt-3">
-              <span class="text-xs text-pink-500 dark:text-pink-400">${formatDate(date)}</span>
-              <button class="like-btn text-gray-400 hover:text-pink-500 dark:hover:text-pink-400" data-id="${noteId}" data-likes="${note.likes || 0}">
-                <i class="${note.likesBy && note.likesBy.includes(auth.currentUser?.uid) ? 'fas' : 'far'} fa-heart"></i> ${note.likes || 0}
-              </button>
-            </div>
-          `;
+          if (snapshot.empty) {
+            loveNotesContainer.innerHTML = '<p class="text-center text-gray-500 dark:text-gray-400 italic">No love notes yet. Be the first to spread some love!</p>';
+            return;
+          }
           
-          loveNotesContainer.appendChild(noteElement);
+          snapshot.forEach(doc => {
+            const note = doc.data();
+            const noteId = doc.id;
+            const date = note.createdAt ? note.createdAt.toDate() : new Date();
+            
+            const noteElement = document.createElement("div");
+            noteElement.className = "bg-white shadow-md p-5 rounded-xl border-l-4 border-pink-400 dark:bg-gray-800 dark:border-pink-600";
+            noteElement.innerHTML = `
+              <p class="text-pink-700 dark:text-pink-300">
+                <strong class="text-pink-800 dark:text-pink-400">To ${note.to}:</strong> 
+                ${note.message} 
+                <span class="font-medium">- ${note.from}</span>
+              </p>
+              <div class="flex justify-between items-center mt-3">
+                <span class="text-xs text-pink-500 dark:text-pink-400">${formatDate(date)}</span>
+                <button class="like-btn-note text-gray-400 hover:text-pink-500 dark:hover:text-pink-400 ${note.likesBy && currentUser && note.likesBy.includes(currentUser.uid) ? 'liked' : ''}" data-note-id="${noteId}">
+                  <i class="${note.likesBy && currentUser && note.likesBy.includes(currentUser.uid) ? 'fas' : 'far'} fa-heart mr-1"></i> ${note.likes || 0}
+                </button>
+              </div>
+            `;
+            
+            loveNotesContainer.appendChild(noteElement);
+          });
+          
+          // Add like functionality to love notes
+          document.querySelectorAll('.like-btn-note').forEach(btn => {
+            btn.addEventListener('click', () => likeLoveNote(btn.dataset.noteId));
+          });
         });
-        
-        // Add like functionality to love notes
-        document.querySelectorAll("#loveNotesContainer .like-btn").forEach(btn => {
-          btn.addEventListener("click", () => likeLoveNote(btn.dataset.id));
-        });
-        
-      } catch (err) {
-        console.error("Error loading love notes:", err);
-        showError("Failed to load love notes");
-      }
     }
 
     // Open memory modal
@@ -813,43 +1234,54 @@
       currentMemoryId = memoryId;
       
       try {
+        // Increment view count
+        await db.collection("memories").doc(memoryId).update({
+          views: firebase.firestore.FieldValue.increment(1)
+        });
+        
         const doc = await db.collection("memories").doc(memoryId).get();
         if (!doc.exists) {
-          showError("Memory not found");
+          showNotification("Memory not found", 'error');
           return;
         }
         
         const memory = doc.data();
         
         // Set modal content
-        modalImage.src = memory.imageUrl;
-        modalTitle.textContent = memory.title;
-        modalAuthor.textContent = `by ${memory.name} ${memory.batch ? `· Batch ${memory.batch}` : ''}`;
-        modalBatch.textContent = memory.created ? formatDate(memory.created.toDate()) : '';
-        modalDescription.textContent = memory.desc;
-        likeCount.textContent = memory.likes || 0;
-        commentCount.textContent = memory.comments ? memory.comments.length : 0;
+        document.getElementById('modalImage').src = memory.imageUrl;
+        document.getElementById('modalTitle').textContent = memory.title;
+        document.getElementById('modalAuthor').textContent = `by ${memory.authorName}`;
+        document.getElementById('modalBatch').textContent = memory.authorBatch ? `Batch ${memory.authorBatch}` : '';
+        document.getElementById('modalDate').textContent = memory.createdAt ? formatDate(memory.createdAt.toDate()) : '';
+        document.getElementById('modalDescription').textContent = memory.desc;
+        document.getElementById('modalLikeCount').textContent = memory.likes || 0;
+        document.getElementById('modalCommentCount').textContent = memory.comments ? memory.comments.length : 0;
         
         // Set like button state
-        const isLiked = memory.likesBy && memory.likesBy.includes(auth.currentUser?.uid);
+        const isLiked = memory.likesBy && currentUser && memory.likesBy.includes(currentUser.uid);
+        const modalLikeBtn = document.getElementById('modalLikeBtn');
         modalLikeBtn.innerHTML = `<i class="${isLiked ? 'fas' : 'far'} fa-heart"></i> ${memory.likes || 0}`;
-        modalLikeBtn.className = `like-btn ${isLiked ? 'liked' : ''}`;
+        modalLikeBtn.className = `like-btn ${isLiked ? 'liked' : ''} text-gray-400 hover:text-pink-500 dark:hover:text-pink-400`;
         
         // Load comments
-        modalComments.innerHTML = '';
-        if (memory.comments && memory.comments.length > 0) {
-          memory.comments.forEach(comment => {
-            const commentElement = document.createElement("div");
-            commentElement.className = "bg-pink-50 dark:bg-gray-700 p-3 rounded-lg";
-            commentElement.innerHTML = `
-              <p class="text-sm font-medium text-pink-700 dark:text-pink-300">${comment.author}</p>
-              <p class="text-sm text-gray-700 dark:text-gray-300 mt-1">${comment.text}</p>
-              <p class="text-xs text-pink-400 dark:text-pink-500 mt-1">${formatDate(comment.timestamp.toDate())}</p>
-            `;
-            modalComments.appendChild(commentElement);
-          });
+        loadModalComments(memory.comments || []);
+        
+        // Show/hide comment form based on auth and settings
+        const commentForm = document.getElementById('commentForm');
+        const loginToComment = document.getElementById('loginToComment');
+        const modalCommentsSection = document.getElementById('modalCommentsSection');
+        
+        if (!memory.allowComments) {
+          modalCommentsSection.classList.add('hidden');
         } else {
-          modalComments.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400 italic">No comments yet</p>';
+          modalCommentsSection.classList.remove('hidden');
+          if (currentUser && !currentUser.isAnonymous) {
+            commentForm.classList.remove('hidden');
+            loginToComment.classList.add('hidden');
+          } else {
+            commentForm.classList.add('hidden');
+            loginToComment.classList.remove('hidden');
+          }
         }
         
         // Show modal
@@ -858,8 +1290,40 @@
         
       } catch (err) {
         console.error("Error opening memory:", err);
-        showError("Failed to load memory");
+        showNotification("Failed to load memory", 'error');
       }
+    }
+
+    // Load modal comments
+    function loadModalComments(comments) {
+      const modalComments = document.getElementById('modalComments');
+      modalComments.innerHTML = '';
+      
+      if (comments.length === 0) {
+        modalComments.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400 italic">No comments yet</p>';
+        return;
+      }
+      
+      // Sort comments by timestamp (newest first)
+      const sortedComments = comments.sort((a, b) => {
+        if (!a.timestamp || !b.timestamp) return 0;
+        return b.timestamp.seconds - a.timestamp.seconds;
+      });
+      
+      sortedComments.forEach(comment => {
+        const commentElement = document.createElement("div");
+        commentElement.className = "bg-pink-50 dark:bg-gray-700 p-3 rounded-lg";
+        commentElement.innerHTML = `
+          <div class="flex justify-between items-start">
+            <div class="flex-1">
+              <p class="text-sm font-medium text-pink-700 dark:text-pink-300">${comment.authorName}</p>
+              <p class="text-sm text-gray-700 dark:text-gray-300 mt-1">${comment.text}</p>
+            </div>
+            <p class="text-xs text-pink-400 dark:text-pink-500 ml-2">${comment.timestamp ? formatDate(comment.timestamp.toDate()) : 'Just now'}</p>
+          </div>
+        `;
+        modalComments.appendChild(commentElement);
+      });
     }
 
     // Close memory modal
@@ -868,205 +1332,323 @@
       document.body.style.overflow = "auto";
     });
 
-    // Like memory
-    modalLikeBtn.addEventListener("click", async () => {
-      if (!auth.currentUser) {
-        showError("Please sign in to like memories");
+    // Like memory function
+    async function likeMemory(memoryId) {
+      if (!currentUser || currentUser.isAnonymous) {
+        showNotification("Please login to like memories", 'error');
         return;
       }
       
       try {
-        const memoryRef = db.collection("memories").doc(currentMemoryId);
+        const memoryRef = db.collection("memories").doc(memoryId);
         const doc = await memoryRef.get();
-        const memory = doc.data();
         
-        const isLiked = memory.likesBy && memory.likesBy.includes(auth.currentUser.uid);
+        if (!doc.exists) {
+          showNotification("Memory not found", 'error');
+          return;
+        }
+        
+        const memory = doc.data();
+        const isLiked = memory.likesBy && memory.likesBy.includes(currentUser.uid);
         const newLikes = isLiked ? (memory.likes || 0) - 1 : (memory.likes || 0) + 1;
         const newLikesBy = isLiked 
-          ? memory.likesBy.filter(id => id !== auth.currentUser.uid)
-          : [...(memory.likesBy || []), auth.currentUser.uid];
+          ? memory.likesBy.filter(id => id !== currentUser.uid)
+          : [...(memory.likesBy || []), currentUser.uid];
         
         await memoryRef.update({
           likes: newLikes,
           likesBy: newLikesBy
         });
         
-        // Update UI
-        modalLikeBtn.innerHTML = `<i class="${!isLiked ? 'fas' : 'far'} fa-heart"></i> ${newLikes}`;
-        modalLikeBtn.className = `like-btn ${!isLiked ? 'liked' : ''}`;
-        likeCount.textContent = newLikes;
-        
-        // Update the memory card like count if it exists
-        const memoryCardLike = document.querySelector(`.view-memory[data-id="${currentMemoryId}"]`)?.closest(".memory-card")?.querySelector(".fa-heart")?.closest("span");
-        if (memoryCardLike) {
-          memoryCardLike.innerHTML = `<i class="far fa-heart mr-1"></i> ${newLikes}`;
+        // Update user's likes count
+        if (!isLiked) {
+          await db.collection('users').doc(currentUser.uid).update({
+            likesCount: firebase.firestore.FieldValue.increment(1)
+          });
+        } else {
+          await db.collection('users').doc(currentUser.uid).update({
+            likesCount: firebase.firestore.FieldValue.increment(-1)
+          });
         }
         
       } catch (err) {
         console.error("Error liking memory:", err);
-        showError("Failed to like memory");
+        showNotification("Failed to like memory", 'error');
       }
-    });
+    }
 
     // Like love note
     async function likeLoveNote(noteId) {
-      if (!auth.currentUser) {
-        showError("Please sign in to like notes");
+      if (!currentUser || currentUser.isAnonymous) {
+        showNotification("Please login to like notes", 'error');
         return;
       }
       
       try {
         const noteRef = db.collection("loveNotes").doc(noteId);
         const doc = await noteRef.get();
-        const note = doc.data();
         
-        const isLiked = note.likesBy && note.likesBy.includes(auth.currentUser.uid);
+        if (!doc.exists) {
+          showNotification("Note not found", 'error');
+          return;
+        }
+        
+        const note = doc.data();
+        const isLiked = note.likesBy && note.likesBy.includes(currentUser.uid);
         const newLikes = isLiked ? (note.likes || 0) - 1 : (note.likes || 0) + 1;
         const newLikesBy = isLiked 
-          ? note.likesBy.filter(id => id !== auth.currentUser.uid)
-          : [...(note.likesBy || []), auth.currentUser.uid];
+          ? note.likesBy.filter(id => id !== currentUser.uid)
+          : [...(note.likesBy || []), currentUser.uid];
         
         await noteRef.update({
           likes: newLikes,
           likesBy: newLikesBy
         });
         
-        // Reload love notes to update UI
-        loadLoveNotes();
-        
       } catch (err) {
         console.error("Error liking love note:", err);
-        showError("Failed to like note");
+        showNotification("Failed to like note", 'error');
       }
     }
 
+    // Modal like button event listener
+    document.getElementById('modalLikeBtn').addEventListener('click', () => {
+      if (currentMemoryId) {
+        likeMemory(currentMemoryId);
+      }
+    });
+
     // Add comment to memory
-    commentForm.addEventListener("submit", async (e) => {
+    document.getElementById('commentForm').addEventListener("submit", async (e) => {
       e.preventDefault();
       
-      if (!auth.currentUser) {
-        showError("Please sign in to comment");
+      if (!currentUser || currentUser.isAnonymous) {
+        showNotification("Please login to comment", 'error');
         return;
       }
       
+      const commentInput = document.getElementById('commentInput');
       const commentText = commentInput.value.trim();
       if (!commentText) return;
       
       try {
-        const memoryRef = db.collection("memories").doc(currentMemoryId);
+        const userDoc = await db.collection('users').doc(currentUser.uid).get();
+        const userData = userDoc.data();
+        
         const newComment = {
-          author: auth.currentUser.displayName || "Anonymous",
+          authorId: currentUser.uid,
+          authorName: `${userData.firstName} ${userData.lastName}`,
           text: commentText,
           timestamp: firebase.firestore.FieldValue.serverTimestamp()
         };
         
-        await memoryRef.update({
+        await db.collection("memories").doc(currentMemoryId).update({
           comments: firebase.firestore.FieldValue.arrayUnion(newComment)
         });
-        
-        // Add comment to UI
-        const commentElement = document.createElement("div");
-        commentElement.className = "bg-pink-50 dark:bg-gray-700 p-3 rounded-lg";
-        commentElement.innerHTML = `
-          <p class="text-sm font-medium text-pink-700 dark:text-pink-300">${newComment.author}</p>
-          <p class="text-sm text-gray-700 dark:text-gray-300 mt-1">${newComment.text}</p>
-          <p class="text-xs text-pink-400 dark:text-pink-500 mt-1">Just now</p>
-        `;
-        modalComments.prepend(commentElement);
-        
-        // Update comment count
-        const currentCount = parseInt(commentCount.textContent);
-        commentCount.textContent = currentCount + 1;
-        
-        // Update the memory card comment count if it exists
-        const memoryCardComment = document.querySelector(`.view-memory[data-id="${currentMemoryId}"]`)?.closest(".memory-card")?.querySelector(".fa-comment")?.closest("span");
-        if (memoryCardComment) {
-          const currentCardCount = parseInt(memoryCardComment.textContent.trim());
-          memoryCardComment.innerHTML = `<i class="far fa-comment mr-1"></i> ${currentCardCount + 1}`;
-        }
         
         // Clear input
         commentInput.value = "";
         
+        showNotification('Comment added!', 'success');
+        
+        // Reload the modal to show the new comment
+        setTimeout(() => {
+          openMemoryModal(currentMemoryId);
+        }, 500);
+        
       } catch (err) {
         console.error("Error adding comment:", err);
-        showError("Failed to add comment");
+        showNotification("Failed to add comment", 'error');
       }
     });
 
     // Search functionality
+    let searchTimeout;
     searchInput.addEventListener("input", (e) => {
-      const searchTerm = e.target.value.toLowerCase();
-      if (searchTerm.length > 2) {
-        const query = db.collection("memories")
-          .orderBy("title")
-          .startAt(searchTerm)
-          .endAt(searchTerm + '\uf8ff');
-        loadMemories(query);
-      } else if (searchTerm.length === 0) {
-        loadMemories();
-      }
+      clearTimeout(searchTimeout);
+      const searchTerm = e.target.value.toLowerCase().trim();
+      
+      searchTimeout = setTimeout(() => {
+        if (searchTerm.length > 2) {
+          // Search in title and description
+          const searchQuery = db.collection("memories")
+            .where("title", ">=", searchTerm)
+            .where("title", "<=", searchTerm + '\uf8ff')
+            .orderBy("title");
+          loadMemories(searchQuery);
+        } else if (searchTerm.length === 0) {
+          loadMemories();
+        }
+      }, 500);
     });
 
     // Sort functionality
     sortNewest.addEventListener("click", () => {
-      loadMemories(db.collection("memories").orderBy("created", "desc"));
-      sortNewest.classList.add("bg-pink-300");
-      sortOldest.classList.remove("bg-pink-300");
-      sortPopular.classList.remove("bg-pink-300");
+      loadMemories(db.collection("memories").orderBy("createdAt", "desc").limit(20));
+      updateSortButtons('newest');
     });
 
     sortOldest.addEventListener("click", () => {
-      loadMemories(db.collection("memories").orderBy("created", "asc"));
-      sortNewest.classList.remove("bg-pink-300");
-      sortOldest.classList.add("bg-pink-300");
-      sortPopular.classList.remove("bg-pink-300");
+      loadMemories(db.collection("memories").orderBy("createdAt", "asc").limit(20));
+      updateSortButtons('oldest');
     });
 
     sortPopular.addEventListener("click", () => {
-      loadMemories(db.collection("memories").orderBy("likes", "desc"));
-      sortNewest.classList.remove("bg-pink-300");
-      sortOldest.classList.remove("bg-pink-300");
-      sortPopular.classList.add("bg-pink-300");
+      loadMemories(db.collection("memories").orderBy("likes", "desc").limit(20));
+      updateSortButtons('popular');
     });
 
-    // Format date
-    function formatDate(date) {
-      const options = { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
-      return date.toLocaleDateString('en-US', options);
-    }
-
-    // Show error message
-    function showError(message) {
-      errorMessage.textContent = message;
-      formError.classList.remove("hidden");
+    function updateSortButtons(active) {
+      [sortNewest, sortOldest, sortPopular].forEach(btn => {
+        btn.classList.remove("bg-pink-300");
+        btn.classList.add("bg-pink-100");
+      });
       
-      setTimeout(() => {
-        formError.classList.add("hidden");
-      }, 5000);
+      switch(active) {
+        case 'newest':
+          sortNewest.classList.add("bg-pink-300");
+          break;
+        case 'oldest':
+          sortOldest.classList.add("bg-pink-300");
+          break;
+        case 'popular':
+          sortPopular.classList.add("bg-pink-300");
+          break;
+      }
     }
 
-    // Initialize
+    // Format date function
+    function formatDate(date) {
+      const now = new Date();
+      const diff = now.getTime() - date.getTime();
+      const diffDays = Math.ceil(diff / (1000 * 3600 * 24));
+      
+      if (diffDays === 1) {
+        return 'Yesterday';
+      } else if (diffDays < 7) {
+        return `${diffDays} days ago`;
+      } else {
+        const options = { year: 'numeric', month: 'short', day: 'numeric' };
+        return date.toLocaleDateString('en-US', options);
+      }
+    }
+
+    // Share functionality
+    document.getElementById('modalShareBtn').addEventListener('click', async () => {
+      if (navigator.share) {
+        try {
+          await navigator.share({
+            title: 'MACE Memories',
+            text: 'Check out this memory from MACE!',
+            url: window.location.href
+          });
+        } catch (err) {
+          console.log('Error sharing:', err);
+        }
+      } else {
+        // Fallback: copy link to clipboard
+        try {
+          await navigator.clipboard.writeText(window.location.href);
+          showNotification('Link copied to clipboard!', 'success');
+        } catch (err) {
+          showNotification('Could not copy link', 'error');
+        }
+      }
+    });
+
+    // Smooth scrolling for navigation links
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+      anchor.addEventListener('click', function (e) {
+        e.preventDefault();
+        const target = document.querySelector(this.getAttribute('href'));
+        if (target) {
+          target.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start'
+          });
+        }
+      });
+    });
+
+    // Close modal when clicking outside
+    memoryModal.addEventListener('click', (e) => {
+      if (e.target === memoryModal) {
+        memoryModal.classList.add('hidden');
+        document.body.style.overflow = 'auto';
+      }
+    });
+
+    authModal.addEventListener('click', (e) => {
+      if (e.target === authModal) {
+        authModal.classList.add('hidden');
+      }
+    });
+
+    // Initialize the app
     function init() {
       // Load initial data
       loadMemories();
       loadLoveNotes();
       
       // Set default sort
-      sortNewest.classList.add("bg-pink-300");
+      updateSortButtons('newest');
       
-      // Anonymous sign-in
-      auth.signInAnonymously()
-        .then(() => {
-          console.log("Signed in anonymously");
-        })
-        .catch(err => {
-          console.error("Anonymous sign-in failed:", err);
-        });
+      // Clear any cached auth errors
+      document.getElementById('authError').classList.add('hidden');
+      document.getElementById('authSuccess').classList.add('hidden');
+      
+      // Reset forms
+      if (memoryForm) memoryForm.reset();
+      if (loveNoteForm) loveNoteForm.reset();
+      if (loginForm) loginForm.reset();
+      if (signupForm) signupForm.reset();
     }
 
-    // Start the app
+    // Start the app when DOM is loaded
     window.addEventListener("DOMContentLoaded", init);
+
+    // Handle online/offline status
+    window.addEventListener('online', () => {
+      showNotification('Connection restored', 'success');
+    });
+
+    window.addEventListener('offline', () => {
+      showNotification('No internet connection', 'error');
+    });
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+      // Escape key to close modals
+      if (e.key === 'Escape') {
+        if (!memoryModal.classList.contains('hidden')) {
+          memoryModal.classList.add('hidden');
+          document.body.style.overflow = 'auto';
+        }
+        if (!authModal.classList.contains('hidden')) {
+          authModal.classList.add('hidden');
+        }
+      }
+      
+      // Ctrl/Cmd + K to focus search
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        searchInput.focus();
+      }
+    });
+
+    // Service Worker Registration (for PWA capabilities)
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .then(registration => {
+            console.log('SW registered: ', registration);
+          })
+          .catch(registrationError => {
+            console.log('SW registration failed: ', registrationError);
+          });
+      });
+    }
+
   </script>
 </body>
 </html>
